@@ -21,6 +21,8 @@ using System.Threading;
 using OxyPlot.WindowsForms;
 using System.Text.RegularExpressions;
 using System.Diagnostics;
+using System.Numerics;
+using System.Windows;
 
 namespace WinFormsApp2
 {
@@ -106,6 +108,8 @@ namespace WinFormsApp2
 
 
         List<object> fafs = new List<object>();
+
+        float[] a_b_p = new float[]{ 0,0,0,0,0 };
 
 
         public Form1()
@@ -912,6 +916,371 @@ namespace WinFormsApp2
             else export_mp.Text = "1.0";
         }
 
+        private async Task Left_foot_brakingAsync()
+        {
+            // update devices
+            JoystickState[] js_array_test = new JoystickState[joysticks_list.Count];
+            float throttle_value_nr = 0;
+            float steer_value_nr = 0;
+            float brake_value_nr = 0;
+
+            double add_x = 0;
+            double add_y = 0;
+            double rotation_angle = 0;
+
+            Collection<DataPoint> lfb_line_series_low = new Collection<DataPoint>();
+            Collection<DataPoint> lfb_line_series_high = new Collection<DataPoint>();
+            Collection<DataPoint> brake_pedal = new Collection<DataPoint>();
+            Collection<DataPoint> Steering_wheel = new Collection<DataPoint>();
+            Collection<DataPoint> Braking_Line = new Collection<DataPoint>();
+
+            double dtt = 0;
+            double dttp = 0;
+            float veh_speed = 200 / 36 * 10;
+            for (int i = 0; i < joysticks_list.Count; i++)
+            {
+                js_array_test[i] = joysticks_list[i].GetCurrentState();
+            }
+            PlotModel lfb_model = new PlotModel();
+            var test = new ScatterSeries();
+            test.MarkerSize = 9;
+            test.MarkerType = MarkerType.Circle;
+
+            //var test_vel = new ScatterSeries();
+            //test_vel.MarkerSize = 6;
+            //test_vel.MarkerType = MarkerType.Cross;
+
+            var vec_x = new LineSeries { Color = OxyColors.Black, StrokeThickness = 1 };
+            var vec_y = new LineSeries { Color = OxyColors.Black, StrokeThickness = 1 };
+
+
+            //var lfb_line_high = new ThreeColorLineSeries {Color = OxyColors.Green, ColorHi = OxyColors.OrangeRed, ColorLo = OxyColors.Blue, LimitHi = 1.02, LimitLo = 0.98};
+            //var lfb_line_low = new ThreeColorLineSeries { Color = OxyColors.Green, ColorHi = OxyColors.OrangeRed, ColorLo = OxyColors.Blue, LimitHi = 1.02, LimitLo = 0.98};
+
+            var lfb_line_high = new LineSeries { Color =  OxyColors.Red, StrokeThickness = 4};
+            var lfb_line_low = new LineSeries { Color = OxyColors.Green, StrokeThickness = 5 };
+
+            bool lfb_draw = false;
+
+            var xaxis = new OxyPlot.Axes.LinearAxis();
+            var yaxis = new OxyPlot.Axes.LinearAxis();
+
+            xaxis.Position = OxyPlot.Axes.AxisPosition.Bottom;
+            yaxis.Position = OxyPlot.Axes.AxisPosition.Left;
+            xaxis.IsAxisVisible = false;
+            yaxis.IsAxisVisible = false;
+
+            var xling = new LineSeries();
+            var yline = new LineSeries();
+            xling.Color = OxyColors.LightGray;
+            yline.Color = OxyColors.LightGray;
+            xling.StrokeThickness = 1;
+            yline.StrokeThickness = 1;
+
+            xling.Points.Add(new DataPoint(-1, 0));
+            xling.Points.Add(new DataPoint(1, 0));
+            yline.Points.Add(new DataPoint(0, -1));
+            yline.Points.Add(new DataPoint(0, 1));
+
+
+            lfb_model.Series.Add(lfb_line_high);
+            lfb_model.Series.Add(lfb_line_low);
+
+            lfb_model.Series.Add(xling);
+            lfb_model.Series.Add(yline);
+
+            lfb_model.Series.Add(DrawModels.CircleLine(1, OxyColors.Black));
+            lfb_model.Series.Add(DrawModels.CircleLine(0.75, OxyColors.DimGray));
+            lfb_model.Series.Add(DrawModels.CircleLine(0.5, OxyColors.Gray));
+            lfb_model.Series.Add(DrawModels.CircleLine(0.25, OxyColors.DarkGray));
+            //lfb_model.Annotations.Add(new OxyPlot.Annotations.LineAnnotation { Type =  OxyPlot.Annotations.LineAnnotationType.Horizontal, X=0, Color = OxyColors.DimGray});
+            //lfb_model.Annotations.Add(new OxyPlot.Annotations.LineAnnotation { Type = OxyPlot.Annotations.LineAnnotationType.Vertical, Y = 0, Color = OxyColors.Black });
+            lfb_model.Series.Add(vec_x);
+            lfb_model.Series.Add(vec_y);
+            lfb_model.Series.Add(test);
+
+
+            double acctt = 0;
+            double accttp = 0;
+
+            var t2 = new OxyThickness(0,0,0,0);
+            lfb_model.PlotAreaBorderThickness = t2;
+            lfb_model.Axes.Add(yaxis);
+            lfb_model.Axes.Add(xaxis);
+            plotView1.Model = lfb_model;
+
+            Braking_Line.Add(new DataPoint(0, 0));
+
+            var speed_angle = Math.Atan2(1, 0);
+            Vector speed_vector_rotation = new Vector { X = 0, Y = 1 };
+
+
+            Vector velocity_normalizde = new Vector { X = 0, Y = 1 };
+            Vector velocity_rotated = new Vector { X = 0, Y = 1 };
+
+
+                List<Form> form = new List<Form>();
+                foreach (Form f in Application.OpenForms)
+                {
+                    form.Add(f);
+                }
+                for (int i =2; i <= form.Count; i++)
+                {
+                    form[i-1].Close();
+                }
+
+            Form3 f3 = new Form3(Braking_Line);
+            f3.Show();
+            Form4 f4 = new Form4(Steering_wheel, brake_pedal);
+            f4.Show();
+
+            while (Settings_enable == true)
+            {
+                dtt = DateTime.Now.Ticks;
+
+                try
+                {
+                    
+                    if (throttle_value_nr == 1 && veh_speed < 200/3.6f)
+                        veh_speed = 200 / 3.6f;
+                    else
+                    {
+                        if (throttle_value_nr > 0)
+                        {
+                            accttp = acctt;
+                            acctt = DateTime.Now.Ticks;
+                            if (accttp>0 && acctt >0)
+                            veh_speed = veh_speed + throttle_value_nr * 9.81f * ((float)(acctt - accttp) / 10000000);
+                            lfb_line_high.Points.Clear();
+                            lfb_line_low.Points.Clear();
+                        }
+                        else
+                        {
+                            if (accttp != 0 && acctt != 0)
+                            accttp = acctt = 0;
+                        }
+
+                    };
+                    
+
+
+                    for (int i = 0; i < joysticks_list.Count; i++)
+                    {
+                        js_array_test[i] = joysticks_list[i].GetCurrentState();
+                    }
+
+
+                    //Steering Section
+
+                    try
+                    {
+                        steer_value_nr = CheckAxis.SteerValue_f(steer_axis, steer_id_dv, steer_half, js_array_test);
+                        throttle_value_nr = CheckAxis.AxisValue_f(comboBox_axis_throttle.Text, throttle_id_dv, throttle_max, js_array_test);
+                        //brake_value_nr = CheckAxis.AxisValue_f(comboBox_axis_brake.Text, brake_id_dv, brake_max, js_array_test);
+                        brake_value_nr = avr_brk_pdl(CheckAxis.AxisValue_f(comboBox_axis_brake.Text, brake_id_dv, brake_max, js_array_test));
+                    }
+                    catch
+                    {
+                        statusStrip1.Invoke((MethodInvoker)(() => statusStrip1.Items[0].Text = "Wrong Settings"));
+                    }
+                    if (checkBox_throttle.Checked == true)
+                        throttle_value_nr = 1 - throttle_value_nr ;
+                    if (checkBox_brake.Checked == true)
+                        brake_value_nr = 1 - brake_value_nr ;
+                    var Rc = 2.450f / Math.Tan(steer_value_nr  * 25*Math.PI/180);
+                    var An = veh_speed * veh_speed / Rc;
+                    //An = An / 9.81;
+                    //An = An / 3;
+
+
+                    Vector2 thr = new Vector2 { Y = throttle_value_nr / 1.50f, X = 0 };
+                    Vector2 brk = new Vector2 { Y = -brake_value_nr / 0.85f, X = 0 };
+                    //Vector2 thr = new Vector2 { Y = -(float)throttle_value_nr/150, X = 0 };
+                    //Vector2 brk = new Vector2 { Y = (float)brake_value_nr/85, X = 0 };
+                    //Vector2 steer = new Vector2 { X = (float)steer_value_nr/100, Y = 0 };
+                    if (An > 2)
+                        An = 2;
+                    if (An < -2)
+                        An = -2;
+                    Vector2 steer = new Vector2 { X = (float)An, Y = 0 };
+
+                    var vall = thr + brk + steer;
+                    var vall2 = vall;
+                    var va_leght = vall.Length();
+                    if (va_leght > 1)
+                    {
+                        vall = Vector2.Normalize(vall) - vall + Vector2.Normalize(vall);
+                    }
+                    if (va_leght > 2)
+                    {
+                        vall.X = 0;
+                        vall.Y = 0;
+                    }
+                    test.Points.Clear();
+                    //test_vel.Points.Clear();
+                    
+                    //vec_x.Points.Clear();
+                    //vec_y.Points.Clear();
+                    test.Points.Add(new ScatterPoint(vall.X, vall.Y));
+                    test.Points.Add(new ScatterPoint(vall2.X, vall2.Y));
+                    
+                    //vec_x.Points.Add(new DataPoint(vall2.X, 0));
+                    //vec_x.Points.Add(new DataPoint(vall2.X, vall2.Y));
+                    //vec_y.Points.Add(new DataPoint(0, vall2.Y));
+                    //vec_y.Points.Add(new DataPoint(vall2.X, vall2.Y));
+
+                    if (brake_value_nr > 0)
+                    {
+                        if (lfb_draw == false)
+                            lfb_draw = true;
+                        else;
+                        //dtt = DateTime.Now.Ticks;
+                        var dt = ((float)(dtt - dttp) / 10000000);
+                        lfb_line_series_low.Add(new DataPoint(vall.X, vall.Y));
+                        lfb_line_series_high.Add(new DataPoint((thr + brk + steer).X, (thr + brk + steer).Y));
+                        if (Steering_wheel.Count ==0 )
+                        Steering_wheel.Add(new DataPoint(0, 1 - Math.Abs(steer_value_nr)));
+                        else Steering_wheel.Add(new DataPoint(Steering_wheel.Last().X +dt, 1- Math.Abs(steer_value_nr)));;
+                        if (brake_pedal.Count == 0)
+                        brake_pedal.Add(new DataPoint(0, Math.Abs(brake_value_nr)));
+                        else
+                            brake_pedal.Add(new DataPoint(brake_pedal.Last().X + dt, Math.Abs(brake_value_nr)));
+
+                        //statusStrip1.Invoke((MethodInvoker)(() => statusStrip1.Items[0].Text = speeed_line.X.ToString() + " | "+ speeed_line.Y.ToString() ));
+
+                    }
+                    else
+                    {
+                        dtt = dttp = 0;
+                        if (lfb_draw == true)
+                        {
+                            //asfsfas
+                            lfb_draw = false;
+                            if (lfb_line_series_high.Count > 50)
+                            {
+                                lfb_line_high.Points.AddRange(lfb_line_series_high);
+                                lfb_line_low.Points.AddRange(lfb_line_series_low);
+                                f3.Update(Braking_Line, add_x, add_y, rotation_angle, veh_speed);
+                                f4.Update( Steering_wheel, brake_pedal);
+                            }
+                        lfb_line_series_high.Clear();
+                        lfb_line_series_low.Clear();
+                        Braking_Line.Clear();
+                        Braking_Line.Add(new DataPoint(0, 0));
+                        Steering_wheel.Clear();
+                        brake_pedal.Clear();
+                        speed_angle = Math.Atan2(1, 0);
+                            velocity_rotated.X = 0;
+                            velocity_rotated.Y = 1;
+                            
+                        }
+                    }
+
+
+                    plotView1.Model.Axes[0].Zoom(-1.075, 1.075);
+                    plotView1.Model.Axes[1].Zoom(-1.075, 1.075);
+                    if (va_leght < 0.25)
+                        test.MarkerFill = OxyColors.Blue;
+                    if (va_leght >= 0.25 && va_leght < 0.5)
+                        test.MarkerFill = OxyColors.RoyalBlue;
+                    if (va_leght >= 0.5 && va_leght < 0.75)
+                        test.MarkerFill = OxyColors.DeepSkyBlue;
+                    if (va_leght >= 0.75 && va_leght < 0.9)
+                        test.MarkerFill = OxyColors.Yellow;
+                    if (va_leght >= 0.9 && va_leght < 0.975)
+                            test.MarkerFill = OxyColors.Orange;
+                    if (va_leght >= 0.98 && va_leght <= 1.02)
+                        test.MarkerFill = OxyColors.Green;
+                    //if (va_leght > 1.025 && va_leght <= 1.10)
+                    //    test.MarkerFill = OxyColors.DarkOrange;
+                    if (va_leght > 1.02 && va_leght <= 1.25)
+                        test.MarkerFill = OxyColors.OrangeRed;
+                    if (va_leght > 1.10)
+                        test.MarkerFill = OxyColors.Red;
+                    plotView1.OnModelChanged();
+                    var bvc = -brk.Y;
+
+                    if (bvc > 1)
+                        bvc = 1 - (brake_value_nr - 1);
+                    if (dttp > 0)
+                    {
+                        var delta_t = ((float)(dtt - dttp) / 10000000);
+
+                        Vector velocity_speed = velocity_normalizde * veh_speed;
+                        Vector braking_vector = new Vector { X = vall.X * 9.81f * delta_t, Y = vall.Y * 9.81f * delta_t };
+                        Vector velocity_plus_brakig = (new Vector { X = 0, Y = veh_speed }) + braking_vector;
+
+                        rotation_angle = -Math.Atan(vall.X*9.81f * delta_t / veh_speed);
+
+                        //test.Points.Add(new ScatterPoint(braking_vector.X, braking_vector.Y));
+
+                        //test.Points.Add(new ScatterPoint(velocity_rotated.X, velocity_rotated.Y));
+
+                        Vector jump = velocity_rotated * delta_t *veh_speed;
+                        add_x = jump.X;
+                        add_y = jump.Y;
+                        Braking_Line.Add(new DataPoint(Braking_Line.Last().X + add_x, Braking_Line.Last().Y + add_y));
+
+                        //test_vel.Points.Add(new ScatterPoint());
+
+                        //speed_txt.Invoke((MethodInvoker)(() => speed_txt.Text = (rotation_angle * 180/Math.PI).ToString() + " Kph"));
+
+                        speed_angle = speed_angle + rotation_angle;
+                        velocity_rotated.X = Math.Cos(speed_angle);
+                        velocity_rotated.Y = Math.Sin(speed_angle);
+
+
+                        veh_speed = veh_speed - bvc * 9.81f * delta_t;
+                       // statusStrip1.Invoke((MethodInvoker)(() => statusStrip1.Items[0].Text = delta_t.ToString() + " | " + velocity_plus_brakig.Length.ToString()));
+
+
+
+                    }
+                    if (veh_speed < 0)
+                        veh_speed = 0;
+                    if (veh_speed == 0)
+                    {
+                        vall.X = 0;
+                        vall.Y = 0;
+                    }
+                    
+                    //statusStrip1.Invoke((MethodInvoker)(() => statusStrip1.Items[0].Text = speeed_line.X.ToString() + " | "+ speeed_line.Y.ToString() ));
+                    speed_txt.Invoke((MethodInvoker)(() => speed_txt.Text = ((int)(veh_speed*3.6f)).ToString() + " Kph" ));
+                    //speed_txt.Invoke((MethodInvoker)(() => speed_txt.Text = Rc.ToString() + " Kph"));
+                    //Text = (steer_value_nr*45).ToString();
+
+                }
+                catch
+                {
+                    //statusStrip1.Invoke((MethodInvoker)(() => statusStrip1.Items[0].Text = "WORNG SETTINGS"));
+                }
+                dttp = dtt;
+                await Task.Delay(1);
+            }
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                Settings_enable = true;
+                foreach (Joystick test in joysticks_list)
+                {
+                    test.Acquire();
+                }
+            }
+            catch
+            {
+                Settings_enable = false;
+                MessageBox.Show("Wrong settings\nCheck settings and try again");
+                foreach (Joystick test in joysticks_list)
+                {
+                    test.Unacquire();
+                }
+            }
+            Left_foot_brakingAsync();
+        }
+
 
         // Get Result Button
 
@@ -1182,6 +1551,9 @@ namespace WinFormsApp2
             this.RequestDeviceData = new System.Windows.Forms.Button();
             this.GetDevices = new System.Windows.Forms.Button();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
+            this.tabPage8 = new System.Windows.Forms.TabPage();
+            this.speed_txt = new System.Windows.Forms.Label();
+            this.plotView1 = new OxyPlot.WindowsForms.PlotView();
             this.LfsTelemetryButton = new System.Windows.Forms.Button();
             this.GetResultButton = new System.Windows.Forms.Button();
             this.RbrTelemetryButton = new System.Windows.Forms.Button();
@@ -1189,6 +1561,7 @@ namespace WinFormsApp2
             this.button3 = new System.Windows.Forms.Button();
             this.acc_telemetry_button = new System.Windows.Forms.Button();
             this.button1 = new System.Windows.Forms.Button();
+            this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
             this.statusStrip1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
@@ -1204,6 +1577,7 @@ namespace WinFormsApp2
             ((System.ComponentModel.ISupportInitialize)(this.trackBar_throttle)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.trackBar_steering)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
+            this.tabPage8.SuspendLayout();
             this.SuspendLayout();
             // 
             // statusStrip1
@@ -1232,6 +1606,7 @@ namespace WinFormsApp2
             this.tabControl1.Controls.Add(this.tabPage5);
             this.tabControl1.Controls.Add(this.tabPage6);
             this.tabControl1.Controls.Add(this.tabPage7);
+            this.tabControl1.Controls.Add(this.tabPage8);
             this.tabControl1.Location = new System.Drawing.Point(0, 39);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
@@ -1870,6 +2245,46 @@ namespace WinFormsApp2
             this.dataGridView1.Size = new System.Drawing.Size(523, 199);
             this.dataGridView1.TabIndex = 0;
             // 
+            // tabPage8
+            // 
+            this.tabPage8.Controls.Add(this.speed_txt);
+            this.tabPage8.Controls.Add(this.plotView1);
+            this.tabPage8.Location = new System.Drawing.Point(4, 22);
+            this.tabPage8.Name = "tabPage8";
+            this.tabPage8.Padding = new System.Windows.Forms.Padding(3);
+            this.tabPage8.Size = new System.Drawing.Size(1351, 384);
+            this.tabPage8.TabIndex = 7;
+            this.tabPage8.Text = "Left Foot Braking";
+            this.tabPage8.UseVisualStyleBackColor = true;
+            // 
+            // speed_txt
+            // 
+            this.speed_txt.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.speed_txt.AutoSize = true;
+            this.speed_txt.BackColor = System.Drawing.SystemColors.Control;
+            this.speed_txt.Font = new System.Drawing.Font("Segoe UI", 27.75F, System.Drawing.FontStyle.Bold);
+            this.speed_txt.ImageAlign = System.Drawing.ContentAlignment.TopRight;
+            this.speed_txt.Location = new System.Drawing.Point(595, 3);
+            this.speed_txt.Name = "speed_txt";
+            this.speed_txt.Size = new System.Drawing.Size(164, 50);
+            this.speed_txt.TabIndex = 33;
+            this.speed_txt.Text = "200 Kph";
+            this.speed_txt.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // plotView1
+            // 
+            this.plotView1.Location = new System.Drawing.Point(0, 0);
+            this.plotView1.Name = "plotView1";
+            this.plotView1.PanCursor = System.Windows.Forms.Cursors.Hand;
+            this.plotView1.Size = new System.Drawing.Size(762, 762);
+            this.plotView1.TabIndex = 2;
+            this.plotView1.Text = "plotView1";
+            this.plotView1.ZoomHorizontalCursor = System.Windows.Forms.Cursors.SizeWE;
+            this.plotView1.ZoomRectangleCursor = System.Windows.Forms.Cursors.SizeNWSE;
+            this.plotView1.ZoomVerticalCursor = System.Windows.Forms.Cursors.SizeNS;
+            // 
             // LfsTelemetryButton
             // 
             this.LfsTelemetryButton.Location = new System.Drawing.Point(6, 6);
@@ -1974,6 +2389,8 @@ namespace WinFormsApp2
             ((System.ComponentModel.ISupportInitialize)(this.trackBar_throttle)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.trackBar_steering)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
+            this.tabPage8.ResumeLayout(false);
+            this.tabPage8.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -2031,30 +2448,60 @@ namespace WinFormsApp2
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (tabControl1.SelectedIndex == 6)
+            if (tabControl1.SelectedIndex == 7)
             {
-                devicestable.Rows.Clear();
-                for (int i = 0; i < deviceslist.Count; i++)
+                this.Size = new System.Drawing.Size(790, 890);
+                this.tabControl1.Size = new System.Drawing.Size(770, 780);
+                try
                 {
-                    devicestable.Rows.Add
-                    (
-                    deviceslist[i].InstanceName,
-                    deviceslist[i].Type,
-                    new Joystick(directinput, deviceslist[i].InstanceGuid).Capabilities.AxeCount,
-                    new Joystick(directinput, deviceslist[i].InstanceGuid).Capabilities.ButtonCount,
-                    isaxisavaliable(i, "X"),
-                    isaxisavaliable(i, "Y"),
-                    isaxisavaliable(i, "Z"),
-                    isaxisavaliable(i, "RotationX"),
-                    isaxisavaliable(i, "RotationY"),
-                    isaxisavaliable(i, "RotationZ"),
-                    isaxisavaliable(i, "Sliders0"),
-                    isaxisavaliable(i, "Sliders1")
-                        );
+                    Settings_enable = true;
+                    foreach (Joystick test in joysticks_list)
+                    {
+                        test.Acquire();
+                    }
                 }
-                dataGridView1.DataSource = devicestable;
-                dataGridView1.AutoResizeColumns();
+                catch
+                {
+                    Settings_enable = false;
+                    MessageBox.Show("Wrong settings\nCheck settings and try again");
+                    foreach (Joystick test in joysticks_list)
+                    {
+                        test.Unacquire();
+                    }
+                }
+                Left_foot_brakingAsync();
             }
+            else
+            {
+                Settings_enable = false;
+                this.Size = new System.Drawing.Size(1375, 513);
+                this.tabControl1.Size = new System.Drawing.Size(1359, 410);
+                if (tabControl1.SelectedIndex == 6)
+                {
+                    devicestable.Rows.Clear();
+                    for (int i = 0; i < deviceslist.Count; i++)
+                    {
+                        devicestable.Rows.Add
+                        (
+                        deviceslist[i].InstanceName,
+                        deviceslist[i].Type,
+                        new Joystick(directinput, deviceslist[i].InstanceGuid).Capabilities.AxeCount,
+                        new Joystick(directinput, deviceslist[i].InstanceGuid).Capabilities.ButtonCount,
+                        isaxisavaliable(i, "X"),
+                        isaxisavaliable(i, "Y"),
+                        isaxisavaliable(i, "Z"),
+                        isaxisavaliable(i, "RotationX"),
+                        isaxisavaliable(i, "RotationY"),
+                        isaxisavaliable(i, "RotationZ"),
+                        isaxisavaliable(i, "Sliders0"),
+                        isaxisavaliable(i, "Sliders1")
+                            );
+                    }
+                    dataGridView1.DataSource = devicestable;
+                    dataGridView1.AutoResizeColumns();
+                }
+            }
+            
         }
 
         private void checkBox_clutch_is_axis_CheckedChanged(object sender, EventArgs e)
@@ -2835,6 +3282,17 @@ namespace WinFormsApp2
 
             MessageBox.Show("Settings saved");
             label4.Invoke((MethodInvoker)(() => label4.Text = ""));
+        }
+
+        public float avr_brk_pdl(float s0)
+        {
+            a_b_p[4] = a_b_p[3];
+            a_b_p[3]=a_b_p[2];
+            a_b_p[2]=a_b_p[1];
+            a_b_p[1]=a_b_p[0];
+            a_b_p[0] = s0;
+            return a_b_p.Average();
+           
         }
     }
 }

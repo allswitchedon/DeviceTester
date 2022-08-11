@@ -30,13 +30,13 @@ namespace WinFormsApp2
 
 	public struct OutSimMain
 	{
-		public Vector AngVel;      // 3 floats, angular velocity vector
+		public Vector_LFS AngVel;      // 3 floats, angular velocity vector
 		public float Heading;  // anticlockwise from above (Z)
 		public float Pitch;        // anticlockwise from right (X)
 		public float Roll;     // anticlockwise from front (Y)
-		public Vector Accel;       // 3 floats X, Y, Z
-		public Vector Vel;     // 3 floats X, Y, Z
-		public Vec Pos;        // 3 ints   X, Y, Z (1m = 65536)
+		public Vector_LFS Accel;       // 3 floats X, Y, Z
+		public Vector_LFS Vel;     // 3 floats X, Y, Z
+		public Vector_LFS_int Pos;        // 3 ints   X, Y, Z (1m = 65536)
 	};
 
 	public struct OutSimInputs
@@ -67,14 +67,14 @@ namespace WinFormsApp2
 		public float TanSlipAngle;     // tangent of slip angle
 	};
 
-	public struct Vector
+	public struct Vector_LFS
     {
 		public float X;
 		public float Y;
 		public float Z;
     }
 
-	public struct Vec
+	public struct Vector_LFS_int
 	{
 		public int X;
 		public int Y;

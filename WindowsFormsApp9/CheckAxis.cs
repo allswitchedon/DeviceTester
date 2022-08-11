@@ -22,6 +22,38 @@ namespace WinFormsApp2
             return value;
         }
 
+        public static float SteerValue_f(string str, int id_dv, float steer_half, SharpDX.DirectInput.JoystickState[] js_array_test)
+        {
+            float value = 0;
+            steer_half = 32767.5f;
+            if (str.Contains(" "))
+            {
+                value = (float)(((Convert.ToSingle(js_array_test[id_dv].Sliders[Convert.ToInt16(str.Split(' ')[1])]) - steer_half) / steer_half));
+            }
+            else
+            {
+                value = (float)(((Convert.ToSingle(js_array_test[id_dv].GetType().GetProperty(str).GetValue(js_array_test[id_dv])) - steer_half) / steer_half));
+            }
+            return value;
+        }
+
+        public static float AxisValue_f(string str, int id, float max, SharpDX.DirectInput.JoystickState[] ja)
+        {
+            float value = 0;
+            if (str.Contains(" "))
+            {
+                value = (float)(((Convert.ToSingle(ja[id].Sliders[Convert.ToInt16(str.Split(' ')[1])])) / max));
+            }
+            else
+            {
+                value =(float)(((Convert.ToSingle(ja[id].GetType().GetProperty(str).GetValue(ja[id]))) / max) );
+            }
+            return value;
+        }
+
+
+
+
         public static int AxisValue(string str, int id, float max, SharpDX.DirectInput.JoystickState[] ja)
         {
             int value = 0;

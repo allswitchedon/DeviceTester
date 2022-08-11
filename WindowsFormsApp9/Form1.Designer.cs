@@ -90,5 +90,9 @@
         private System.Windows.Forms.MaskedTextBox dr_udp_tb;
         private System.Windows.Forms.MaskedTextBox rbr_udp_tb;
         private System.Windows.Forms.MaskedTextBox lfs_udp_tb;
+        private System.Windows.Forms.TabPage tabPage8;
+        private OxyPlot.WindowsForms.PlotView plotView1;
+        private System.Windows.Forms.SaveFileDialog saveFileDialog1;
+        private System.Windows.Forms.Label speed_txt;
     }
 }

@@ -50,5 +50,53 @@ namespace WinFormsApp2
             model.Series.Add(output_line);
             return model;
         }
+
+        public static LineSeries CircleLine(double r, OxyColor color)
+        {
+            var circle = new LineSeries();
+            circle.InterpolationAlgorithm = InterpolationAlgorithms.ChordalCatmullRomSpline;
+            circle.Color = color;
+            var rm = r;
+            r = r * -1;
+            circle.Points.Add(new DataPoint(0, -rm));
+            while (r <= rm)
+            {
+                circle.Points.Add(new DataPoint(System.Math.Sqrt(rm*rm - (r * r)), r));
+                r = r + 0.01;
+            }
+            circle.Points.Add(new DataPoint(0, rm));
+            while (r > -rm)
+            {
+                r = r - 0.01;
+                circle.Points.Add(new DataPoint(-System.Math.Sqrt(rm * rm - (r * r)), r));
+
+            }
+            circle.Points.Add(new DataPoint(0, -rm));
+            return circle;
+        }
+
+        public static LineSeries LeftFootBraking_Line(double r, OxyColor color)
+        {
+            var circle = new LineSeries();
+            circle.InterpolationAlgorithm = InterpolationAlgorithms.ChordalCatmullRomSpline;
+            circle.Color = color;
+            var rm = r;
+            r = r * -1;
+            circle.Points.Add(new DataPoint(0, -rm));
+            while (r <= rm)
+            {
+                circle.Points.Add(new DataPoint(System.Math.Sqrt(rm * rm - (r * r)), r));
+                r = r + 0.01;
+            }
+            circle.Points.Add(new DataPoint(0, rm));
+            while (r > -rm)
+            {
+                r = r - 0.01;
+                circle.Points.Add(new DataPoint(-System.Math.Sqrt(rm * rm - (r * r)), r));
+
+            }
+            circle.Points.Add(new DataPoint(0, -rm));
+            return circle;
+        }
     }
 }
